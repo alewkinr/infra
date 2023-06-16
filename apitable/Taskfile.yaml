@@ -1,0 +1,23 @@
+version: '3'
+
+# TODO: Обобщить скрипт установки docker и docker-composeV2 на ubuntu
+
+vars:
+ APPLICATION_DIR: $HOME/apitable
+
+tasks:
+ apitable:setup:
+  desc: "Устанавливаем https://apitable.com"
+  vars:
+   DATA_DIR: /mnt/disk0/apitable/data
+  cmds:
+   - echo "▶️ Downloading install script docker"
+   # downloads script and installs the docker-compose v2
+   - curl https://apitable.github.io/install.sh | bash
+  silent: true
+ apitable:update-config:
+  desc: "🔧️ Update configurations from .env"
+  cmds:
+   - |
+    cd "{{ .APPLICATION_DIR }}"
+    sudo docker compose up -d
