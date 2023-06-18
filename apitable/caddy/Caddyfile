@@ -91,14 +91,16 @@
 	}
 }
 
-{$SERVER_DOMAIN:localhost:80} {
-	vars backend_addr {$API_PROXY}
-	vars room_addr {$ROOM_SERVER}
-	vars roomsocket_addr {$SOCKET_SERVER}
-	vars roomsocketroom_addr {$API_SOCKET_SERVER_ROOM}
-	vars webserver_addr {$WEB_SERVER}
-	vars imageproxy_addr {$IMAGEPROXY_SERVER}
-	vars minio_addr {$S3_SERVER}
+{$SERVER_DOMAIN:localhost} {
+	vars {
+		backend_addr "{$API_PROXY}"
+		room_addr "{$ROOM_SERVER}"
+		roomsocket_addr "{$SOCKET_SERVER}"
+		roomsocketroom_addr "{$API_SOCKET_SERVER_ROOM}"
+		webserver_addr "{$WEB_SERVER}"
+		imageproxy_addr "{$IMAGEPROXY_SERVER}"
+		minio_addr "{$S3_SERVER}"
+	}
 
 	request_body {
 		max_size 1GiB #1 GiB
