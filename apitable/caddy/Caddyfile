@@ -83,14 +83,6 @@
 	}
 }
 
-(proxy_webserver_socket) {
-	reverse_proxy {args.0} {
-		import proxy_headers
-		import http_defaults
-		import socket_headers
-	}
-}
-
 {$SERVER_DOMAIN:localhost} {
 	vars {
 		backend_addr "{$API_PROXY}"
@@ -190,7 +182,7 @@
 	}
 
 	handle /_next/* {
-		import proxy_webserver_socket {vars.webserver_addr}
+		import proxy_webserver {vars.webserver_addr}
 	}
 
 	handle /web_build/* {
