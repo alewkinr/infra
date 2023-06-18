@@ -74,17 +74,19 @@ services:
     condition: service_healthy
 
  # Third Party Dockers
- gateway:
-  image: ${IMAGE_REGISTRY}/${IMAGE_GATEWAY}
+ caddy:
+  image: caddy:2.6.4-alpine
   pull_policy: ${IMAGE_PULL_POLICY:-if_not_present}
   restart: always
   ports:
-   - ${NGINX_HTTP_PORT:-80}:80
-   - ${NGINX_HTTPS_PORT:-443}:443
-  environment:
-   - TZ=${TIMEZONE}
-  networks:
-   - apitable
+   - ${CADDY_HTTP_PORT:-80}:80
+   - ${CADDY_HTTPS_PORT:-443}:443
+  volumes:
+   - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+   - ${DATA_PATH}/.data/caddy/data:/data
+   - ${DATA_PATH}/.data/caddy/config:/config
+  env_file:
+   - "${ENV_FILE:-.env}"
   depends_on:
    web-server:
     condition: service_started
@@ -96,6 +98,8 @@ services:
     condition: service_started
    init-appdata:
     condition: service_completed_successfully
+  networks:
+   - apitable
 
  minio:
   image: ${IMAGE_MINIO}
