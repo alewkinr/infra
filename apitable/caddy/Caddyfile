@@ -1,0 +1,204 @@
+(http_defaults) {
+	transport http {
+		dial_timeout 300s
+		read_timeout 300s
+		write_timeout 300s
+		versions 1.1
+	}
+}
+
+(no_cache_headers) {
+	header +Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+}
+(cache_headers) {
+	header +Cache-Control "max-age=604800"
+}
+
+(proxy_headers) {
+	header_up +X-Real-IP {http.request.remote.host}
+	header_up -Connection
+
+	header_down +Access-Control-Allow-Origin {http.request.host}
+	header_down +Access-Control-Allow-Methods "GET,POST,OPTIONS,DELETE,PATCH,PUT"
+	header_down +Access-Control-Allow-Headers "Authorization,Cookie,Set-Cookie,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range,X-APITable-User-Agent,X-Vika-User-Agent"
+	header_down +Access-Control-Allow-Credentials "true"
+}
+
+(socket_headers) {
+	header_up +X-Nginx-Proxy "true"
+	header_up +Host {remote_host}:{remote_port}
+
+	header_down Access-Control-Allow-Origin "*"
+	header_down +Connection "Upgrade"
+	header_down +Upgrade "websocket"
+}
+
+(proxy_room_http) {
+	reverse_proxy {args.0} {
+		header_down Access-Control-Allow-Origin "*"
+		import proxy_headers
+		import http_defaults
+	}
+}
+
+(proxy_room_socket) {
+	reverse_proxy {args.0} {
+		import socket_headers
+		import http_defaults
+	}
+}
+
+(proxy_room_socketroom) {
+	reverse_proxy {args.0} {
+		import socket_headers
+		import http_defaults
+	}
+}
+
+(proxy_backend) {
+	reverse_proxy {args.0} {
+		import proxy_headers
+	}
+}
+
+(proxy_imageproxy) {
+	reverse_proxy {args.0} {
+		header_up +Host {args.1}
+		import proxy_headers
+		import http_defaults
+	}
+}
+
+(proxy_minio) {
+	reverse_proxy {args.0} {
+		import proxy_headers
+		import http_defaults
+	}
+}
+
+(proxy_webserver) {
+	reverse_proxy {args.0} {
+		import proxy_headers
+		import http_defaults
+	}
+}
+
+(proxy_webserver_socket) {
+	reverse_proxy {args.0} {
+		import proxy_headers
+		import http_defaults
+		import socket_headers
+	}
+}
+
+{$SERVER_DOMAIN:localhost:80} {
+	vars backend_addr {$API_PROXY}
+	vars room_addr {$ROOM_SERVER}
+	vars roomsocket_addr {$SOCKET_SERVER}
+	vars roomsocketroom_addr {$API_SOCKET_SERVER_ROOM}
+	vars webserver_addr {$WEB_SERVER}
+	vars imageproxy_addr {$IMAGEPROXY_SERVER}
+	vars minio_addr {$S3_SERVER}
+
+	request_body {
+		max_size 1GiB #1 GiB
+	}
+	encode gzip {
+		minimum_length 1024
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/javascript*
+			header Content-Type application/x-javascript*
+			header Content-Type application/xhtml+xml*
+			header Content-Type application/atom+xml*
+			header Content-Type application/rss+xml*
+			header Content-Type image/svg+xml*
+		}
+	}
+
+	# MINIO assets routes
+	@put {
+		path /assets/*
+		method PUT
+	}
+	@imageViewQuery {
+		path /assets/*
+		not query imageView=*
+	}
+
+	handle @put {
+		import proxy_minio {vars.minio_addr}
+	}
+	handle @imageViewQuery {
+		import proxy_minio {vars.minio_addr}
+	}
+	handle /assets/ {
+		respond 403
+	}
+
+	handle /assets/* {
+		rewrite * /image/assets{uri}
+		import proxy_imageproxy {vars.imageproxy_addr} {vars.minio_addr}
+	}
+
+	@nest {
+		path_regexp (actuator|nest)
+	}
+	handle @nest {
+		import proxy_room_http {vars.room_addr}
+	}
+
+	@options {
+		method OPTIONS
+	}
+	handle /fusion/* {
+		handle @options {
+			respond 204
+		}
+		import proxy_room_http {vars.room_addr}
+	}
+
+	# RoomServer routes
+	handle /notification/* {
+		import proxy_room_socket {vars.roomsocket_addr}
+	}
+	handle /room/* {
+		import proxy_room_socketroom {vars.roomsocketroom_addr}
+	}
+
+	# BackendApi routes
+	handle /api/* {
+		import proxy_backend {vars.backend_addr}
+	}
+
+	# WebServer routes
+	@specificWebRoutes {
+		path_regexp (login|space|user|invite|share|template|404|workbench|org|management|notify|embed|custom|file)
+	}
+	handle @specificWebRoutes {
+		import no_cache_headers
+		import proxy_webserver {vars.webserver_addr}
+	}
+
+	handle /widget-stage/* {
+		rewrite * /widget-stage{uri}
+		import no_cache_headers
+		import proxy_webserver {vars.webserver_addr}
+	}
+
+	handle /_next/* {
+		import proxy_webserver_socket {vars.webserver_addr}
+	}
+
+	handle /web_build/* {
+		rewrite * /web_build{uri}
+		import cache_headers
+		import proxy_webserver {vars.webserver_addr}
+	}
+
+	handle /* {
+		import no_cache_headers
+		import proxy_webserver {vars.webserver_addr}
+	}
+}
