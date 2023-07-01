@@ -1,0 +1,110 @@
+# Use this file only to configure Kratos behavior. Do not use it to set secrets or passwords!
+# For secrets and passwords, use environment variables described in env-example.
+# IF YOU NEED TO SETUP FLOWS  OR IDENTITY SCHEMAS, SCROLL DOWN TO THE BOTTOM OF THIS FILE
+
+### GENERAL SETTINGS ###
+version: v0.13.0
+# setup app serving options
+serve:
+ public:
+  cors:
+   enabled: true
+   allow_credentials: true
+   allowed_headers:
+    - Authorization
+    - Content-Type
+    - Cookie
+   exposed_headers:
+    - Content-Type
+    - Set-Cookie
+   allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+  request_log:
+   disable_for_health: true
+ admin:
+  request_log:
+   disable_for_health: true
+expose-metrics-port: 8010
+# setup mail/sms sending options
+courier:
+ message_retries: 10
+# setup logging settings
+log:
+ format: json
+ leak_sensitive_values: false
+# setup session cookie
+session:
+ lifespan: 720h # 30 days
+ cookie:
+  name: auth_session
+  path: /
+  same_site: lax
+ whoami:
+  required_aal: aal1 # 2FA is not required to get session info
+# setup password hashers algorithm
+hashers:
+ algorithm: bcrypt
+ bcrypt:
+  cost: 12
+# setup cipher algorithm (OIDC-supported only)
+ciphers:
+ algorithm: xchacha20-poly1305
+
+#### IDENTITIES ####
+identity:
+ default_schema_id: user-v1
+ schemas:
+  - id: user-v1
+    url: file:///etc/config/kratos/schemas/user.v1.traits.schema.json
+
+#### FLOWS ####
+selfservice:
+ # authentication flows
+ flows:
+  registration: # registration flow
+   lifespan: 24h
+   after:
+    password:
+     hooks:
+      - hook: session
+      - hook: show_verification_ui
+  login:
+   lifespan: 24h
+   after:
+    hooks:
+     - hook: require_verified_address # allows users to sign in only when they verified their email address.
+  verification:
+   enabled: true
+   use: code
+  settings:
+   privileged_session_max_age: 15m
+   required_aal: highest_available
+  recovery:
+   enabled: true
+   use: code
+ # authentication methods
+ methods:
+  password: # The password method implements the login and registration with "email or/and username and password" method, and "change your password" user settings method.
+   enabled: true
+   config:
+    identifier_similarity_check_enabled: false
+    min_password_length: 8
+  totp:
+   enabled: true
+  lookup_secret: # Lookup Secrets, also known as Backup Codes or Recovery Codes, are a 2FA fail-safe mechanism, rather than a standalone two-factor authentication method. They can be used to complete the second factor when users lose access to their selected 2FA method.
+   enabled: true
+  profile: # The profile method implements the "update your profile", "change your first/last name, ..." user settings method).
+   enabled: true
+  code: # The code method implements a one-time-password sent to the user via their recovery addresses (Email, SMS, etc.)
+   enabled: true
+   config:
+    lifespan: 15m
+
+
+
+
+

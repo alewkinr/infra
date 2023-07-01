@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+ # identity servers
+ kratos:
+  image: oryd/kratos:v0.13.0
+  pull_policy: ${IMAGE_PULL_POLICY:-if_not_present}
+  restart: always
+  ports:
+   - "4433:4433" # public-api
+   - "4434:4434" # admin-api
+   - "4455:4455" # self-service UI
+   - "8010:8010" # metrics
+  env_file:
+   - "${ENV_FILE:-.env}"
+  entrypoint: [ "kratos", "serve" ]
+  volumes:
+   - ./kratos.yaml:/home/ory/kratos.yaml
+   - ./identity-schemas/:/etc/config/kratos/schemas/
+
+ # mail watcher
+ courier-watcher:
+  container_name: courier-watcher-singleton
+  image: oryd/kratos:v0.13.0
+  pull_policy: ${IMAGE_PULL_POLICY:-if_not_present}
+  restart: always
+  env_file:
+   - "${ENV_FILE:-.env}"
+  entrypoint: [ "kratos", "courier", "watch" ]
+  volumes:
+   - ./kratos.yaml:/home/ory/kratos.yaml
+   - ./identity-schemas/:/etc/config/kratos/
